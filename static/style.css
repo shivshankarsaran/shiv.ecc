@@ -1,0 +1,156 @@
+/* static/style.css - Enhanced styling */
+:root {
+  --bg: #0b1020;
+  --panel: rgba(18, 24, 45, 0.92);
+  --panel-2: rgba(28, 36, 66, 0.92);
+  --text: #e7ecff;
+  --muted: #a8b2d1;
+  --accent: #7c5cff;
+  --accent-2: #20d3ff;
+  --border: rgba(255,255,255,0.08);
+  --success: #2dd4bf;
+  --danger: #fb7185;
+  --shadow: 0 20px 60px rgba(0,0,0,0.35);
+  --radius: 22px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(180deg, #070b16 0%, #0b1020 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.wrap { max-width: 1400px; margin: 0 auto; padding: 28px 18px; }
+
+.hero { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 24px; }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px;
+  backdrop-filter: blur(15px);
+}
+
+h1 { font-size: 2.5rem; margin: 0 0 12px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+.subtitle { color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.pill {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  backdrop-filter: blur(10px);
+}
+
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 24px; }
+
+.span-12 { grid-column: span 12; }
+.span-6 { grid-column: span 6; }
+.span-4 { grid-column: span 4; }
+
+form { display: grid; gap: 16px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field.wide { grid-column: span 12; }
+
+label { font-size: 0.9rem; color: var(--muted); font-weight: 500; }
+
+input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,92,255,0.1);
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.08);
+}
+
+.btnrow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+
+button {
+  border: 0;
+  border-radius: 16px;
+  padding: 14px 24px;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 12px 32px rgba(124,92,255,0.3);
+  transition: all 0.2s ease;
+}
+
+button:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(124,92,255,0.4); }
+
+.kpi { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+
+.box {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(255,255,255,0.04);
+  text-align: center;
+}
+
+.val { font-size: 1.4rem; font-weight: 800; color: var(--accent-2); margin-top: 4px; }
+
+.mono { font-family: 'Courier New', monospace; font-size: 0.9rem; }
+
+.err, .ok {
+  padding: 16px 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  border-left: 5px solid;
+}
+
+.err { border-left-color: var(--danger); background: rgba(251,113,133,0.1); color: #ffd9e0; }
+.ok { border-left-color: var(--success); background: rgba(45,212,191,0.1); color: #d7fffb; }
+
+.table { display: grid; gap: 12px; }
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+}
+
+.label { color: var(--muted); font-weight: 500; }
+.value { text-align: right; word-break: break-all; }
+
+.plot {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.row.success { border-left: 4px solid var(--success); background: rgba(45,212,191,0.1); }
+
+@media (max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+  .span-6, .span-12, span-4 { grid-column: span 1; }
+  h1 { font-size: 2rem; }
+}
