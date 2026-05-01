@@ -74,6 +74,27 @@ class ScalarResult:
     report_steps: List[Dict[str, Any]]
     error: Optional[str] = None
 
+@dataclass
+class DivisionResult:
+    G: Point
+    K: Point
+    k: int
+    m1_float: float
+    m1: int
+    s_float: float
+    s_inv_float: float
+    s: int
+    r1: int
+    P_m1: Point
+    C1: Point
+    C2: Point
+    C1_scaled: Point
+    C2_scaled: Point
+    decrypted_point: Point
+    result: Optional[float]
+    report_steps: List[Dict[str, Any]]
+    error: Optional[str] = None
+
 class EllipticCurve:
     def __init__(self, a: int, b: int, p: int):
         self.a = a
@@ -233,10 +254,10 @@ def compute_curve_result(form: Dict[str, str]) -> CurveResult:
     )
 
 
-def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> HomoResult:
+def compute_homo_result(curve_result: CurveResult, form: Dict[str, str], operation: str = "add") -> HomoResult:
     p = curve_result.p
     order_G = curve_result.order_G
-    max_m = ((order_G // 2 - 1)/scale)
+    max_m = ((order_G // 2 - 1) / scale)
 
     m1_float = float(form.get("m1", 0))
     m2_float = float(form.get("m2", 0))
@@ -247,10 +268,26 @@ def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> Homo
     r1 = int(form.get("r1", 3))
     r2 = int(form.get("r2", 7))
 
-    if not (0 <= m1 <= max_m * scale and 0 <= m2 <= max_m * scale):
-        raise ValueError(f"Messages must be between 0 and {max_m}.")
+    if operation == "add":
+        if not (0 <= m1 <= max_m * scale and 0 <= m2 <= max_m * scale):
+            raise ValueError(f"Messages must be between 0 and {max_m}.")
+
+    elif operation == "sub":
+        max_sub_m = ((order_G//2) -1) / scale
+
+        if not (0 <= m1 <= max_sub_m * scale):
+            raise ValueError(f"m1 must be between 0 and {max_sub_m}.")
+
+        if not (0 <= m2 <= max_sub_m * scale):
+            raise ValueError(f"m2 must be between 0 and {max_sub_m}.")
+
+        if m2 > m1:
+            raise ValueError("m2 must be less than m1 for subtraction.")    
     if not (0 <= r1 < p and 0 <= r2 < p):
         raise ValueError(f"Random values must be between 0 and {p - 1}.")
+
+    if operation not in {"add", "sub"}:
+        raise ValueError("operation must be 'add' or 'sub'.")
 
     curve = EllipticCurve(curve_result.a, curve_result.b, p)
     G = curve_result.G
@@ -267,18 +304,32 @@ def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> Homo
     C1_2 = curve.multiply(r2, G)
     C2_2 = curve.add(enc_m2, curve.multiply(r2, K))
 
-    # Homomorphic addition of ciphertexts
-    C1_sum = curve.add(C1_1, C1_2)
-    C2_sum = curve.add(C2_1, C2_2)
+    # Homomorphic operation on ciphertexts
+    if operation == "add":
+        C1_sum = curve.add(C1_1, C1_2)
+        C2_sum = curve.add(C2_1, C2_2)
+        op_word = "addition"
+        op_symbol = "+"
+        result_suffix = "sum"
+    else:
+        C1_sum = curve.add(C1_1, curve.negate(C1_2))
+        C2_sum = curve.add(C2_1, curve.negate(C2_2))
+        op_word = "subtraction"
+        op_symbol = "-"
+        result_suffix = "diff"
 
     # Decryption
     decrypted_point = curve.add(
         C2_sum,
         curve.negate(curve.multiply(k, C1_sum))
-)
+    )
+
     decoded_int = curve.decode_scalar_mult_to_int(decrypted_point, G)
 
     if decoded_int is not None:
+        # For subtraction, convert large modulo representation back to signed value
+        if operation == "sub" and order_G is not None and decoded_int > order_G // 2:
+            decoded_int -= order_G
         ecc_decoded_sum = decoded_int / scale
     else:
         ecc_decoded_sum = None
@@ -300,10 +351,10 @@ def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> Homo
         {"kind": "normal", "label": "Ciphertext 1: C2_1 = m1·G + r1·K", "value": point_str(C2_1)},
         {"kind": "normal", "label": "Ciphertext 2: C1_2 = r2·G", "value": point_str(C1_2)},
         {"kind": "normal", "label": "Ciphertext 2: C2_2 = m2·G + r2·K", "value": point_str(C2_2)},
-        {"label": "Homomorphic add: C1_sum = C1_1 + C1_2", "value": point_str(C1_sum)},
-        {"label": "Homomorphic add: C2_sum = C2_1 + C2_2", "value": point_str(C2_sum)},
-        {"label": "Decryption: C2_sum - k·C1_sum", "value": point_str(decrypted_point)},
-        {"kind": "success", "label": "Recovered sum point", "value": point_str(decrypted_point)},
+        {"kind": "normal", "label": f"Homomorphic {op_word}: C1_{result_suffix} = C1_1 {op_symbol} C1_2", "value": point_str(C1_sum)},
+        {"kind": "normal", "label": f"Homomorphic {op_word}: C2_{result_suffix} = C2_1 {op_symbol} C2_2", "value": point_str(C2_sum)},
+        {"kind": "normal", "label": f"Decryption: C2_{result_suffix} - k·C1_{result_suffix}", "value": point_str(decrypted_point)},
+        {"kind": "success", "label": f"Recovered {op_word} point", "value": point_str(decrypted_point)},
         {"kind": "success", "label": "Decoded final answer", "value": ecc_decoded_sum if ecc_decoded_sum is not None else "N/A"},
     ]
 
@@ -313,7 +364,7 @@ def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> Homo
         k=k,
         m1=m1,
         m2=m2,
-        m1_float=m1_float, 
+        m1_float=m1_float,
         m2_float=m2_float,
         r1=r1,
         r2=r2,
@@ -329,7 +380,6 @@ def compute_homo_result(curve_result: CurveResult, form: Dict[str, str]) -> Homo
         ecc_decoded_sum=ecc_decoded_sum,
         report_steps=report_steps,
     )
-
 
 def compute_scalar_result(curve_result: CurveResult, form: Dict[str, str]) -> ScalarResult:
     scale = 10
@@ -413,11 +463,106 @@ def compute_scalar_result(curve_result: CurveResult, form: Dict[str, str]) -> Sc
     )
 
 
+def compute_division_result(curve_result: CurveResult, form: Dict[str, str]) -> DivisionResult:
+    scale = 10
+
+    curve = EllipticCurve(curve_result.a, curve_result.b, curve_result.p)
+    G = curve_result.G
+
+    # --- Inputs ---
+    m1_float = float(form.get("m1", 0))
+    s_float = float(form.get("s", 0))
+
+    if s_float == 0:
+        raise ValueError("Division by zero is not allowed.")
+
+    s_inv_float = scale*scale / s_float
+
+    m1 = int(m1_float * scale)
+    s = int(round(s_inv_float,1))
+
+    if s <= 0:
+        raise ValueError("Effective division scalar is too small.")
+
+    k = int(form.get("k", 2))
+    r1 = int(form.get("r1", 3))
+
+    # --- Keys ---
+    K = curve.multiply(k, G)
+
+    # --- Encode ---
+    P_m1 = curve.multiply(m1, G)
+
+    # --- Encrypt ---
+    C1 = curve.multiply(r1, G)
+    C2 = curve.add(P_m1, curve.multiply(r1, K))
+
+    # --- Division of ciphertext (multiply by inverse scalar) ---
+    C1_scaled = curve.multiply(s, C1)
+    C2_scaled = curve.multiply(s, C2)
+
+    # --- Decrypt ---
+    decrypted_point = curve.add(
+        C2_scaled,
+        curve.negate(curve.multiply(k, C1_scaled))
+    )
+
+    # --- Decode ---
+    decoded_int = curve.decode_scalar_mult_to_int(decrypted_point, G)
+
+    if decoded_int is not None:
+        decoded_float =round(decoded_int / (1000),2)
+    else:
+        decoded_float = None
+
+    report_steps = [
+        {"kind": "normal", "label": "Curve equation", "value": f"y² = x³ + {curve_result.a}x + {curve_result.b} mod {curve_result.p}"},
+        {"kind": "normal", "label": "Generator point (G)", "value": point_str(G)},
+        {"kind": "normal", "label": "Private key (k)", "value": k},
+        {"kind": "normal", "label": "Public key (K = kG)", "value": point_str(K)},
+        {"kind": "normal", "label": "Message m1 (float)", "value": m1_float},
+        {"kind": "normal", "label": "Scaled m1", "value": m1},
+        {"kind": "normal", "label": "Divisor s (float)", "value": s_float},
+        {"kind": "normal", "label": "Inverse scalar 1/s", "value": s_inv_float},
+        {"kind": "normal", "label": "Scaled inverse scalar", "value": s},
+        {"kind": "normal", "label": "Random r1", "value": r1},
+        {"kind": "normal", "label": "Encode m1 → m1·G", "value": point_str(P_m1)},
+        {"kind": "normal", "label": "Ciphertext: C1 = r1·G", "value": point_str(C1)},
+        {"kind": "normal", "label": "Ciphertext: C2 = P_m1 + r1·K", "value": point_str(C2)},
+        {"kind": "normal", "label": "Scaled ciphertext: C1' = s·C1", "value": point_str(C1_scaled)},
+        {"kind": "normal", "label": "Scaled ciphertext: C2' = s·C2", "value": point_str(C2_scaled)},
+        {"kind": "normal", "label": "Decryption: C2' - k·C1'", "value": point_str(decrypted_point)},
+        {"kind": "success", "label": "Recovered result point", "value": point_str(decrypted_point)},
+        {"kind": "success", "label": "Decoded final answer", "value": decoded_float if decoded_float is not None else "N/A"},
+    ]
+
+    return DivisionResult(
+        G=G,
+        K=K,
+        k=k,
+        m1_float=m1_float,
+        m1=m1,
+        s_float=s_float,
+        s_inv_float=s_inv_float,
+        s=s,
+        r1=r1,
+        P_m1=P_m1,
+        C1=C1,
+        C2=C2,
+        C1_scaled=C1_scaled,
+        C2_scaled=C2_scaled,
+        decrypted_point=decrypted_point,
+        result=decoded_float,
+        report_steps=report_steps,
+    )
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     curve_result = None
     homo_result = None
+    sub_result = None
     scalar_result = None
+    division_result = None
     error = None
     step = request.form.get("step", "1") if request.method == "POST" else "1"
 
@@ -436,7 +581,7 @@ def index():
                 "p": request.form.get("curve_p"),
             }
             curve_result = compute_curve_result(curve_form)
-            homo_result = compute_homo_result(curve_result, request.form)
+            homo_result = compute_homo_result(curve_result, request.form, operation="add")
         except Exception as e:
             error = str(e)
 
@@ -452,22 +597,51 @@ def index():
         except Exception as e:
             error = str(e)
 
-    max_m = (curve_result.order_G // 2 - 1)/10 if curve_result else 0
-    max_m1 = (int(curve_result.order_G**(1/2)))/10 if curve_result else 0
-    max_s = (int(curve_result.order_G**(1/2)))/10 if curve_result else 0
+    elif step == "4":
+        try:
+            curve_form = {
+                "a": request.form.get("curve_a"),
+                "b": request.form.get("curve_b"),
+                "p": request.form.get("curve_p"),
+            }
+            curve_result = compute_curve_result(curve_form)
+            sub_result = compute_homo_result(curve_result, request.form, operation="sub")
+        except Exception as e:
+            error = str(e)
+    
+    elif step == "5":
+        try:
+            curve_form = {
+                "a": request.form.get("curve_a"),
+                "b": request.form.get("curve_b"),
+                "p": request.form.get("curve_p"),
+            }
+            curve_result = compute_curve_result(curve_form)
+            division_result = compute_division_result(curve_result, request.form)
+        except Exception as e:
+            error = str(e)
+
+    max_m = (curve_result.order_G // 2 - 1) / 10 if curve_result else 0
+    max_sub_m = (curve_result.order_G//2 - 1) / 10 if curve_result else 0
+    max_m1 = (int((curve_result.order_G-1) ** (1 / 2))) / 10 if curve_result else 0
+    max_md= (int((curve_result.order_G-1)/ 1000)) if curve_result else 0
+    max_s = (int((curve_result.order_G-1) ** (1 / 2))) / 10 if curve_result else 0
 
     return render_template(
-    "index.html",
-    curve_result=curve_result,
-    homo_result=homo_result,
-    scalar_result=scalar_result, 
-    error=error,
-    step=step,
-    max_m=max_m,
-    max_m1=max_m1,
-    max_s=max_s,
-)
-
+        "index.html",
+        curve_result=curve_result,
+        homo_result=homo_result,
+        sub_result=sub_result,
+        scalar_result=scalar_result,
+        division_result=division_result,
+        error=error,
+        step=step,
+        max_m=max_m,
+        max_m1=max_m1,
+        max_md=max_md,
+        max_s=max_s,
+        max_sub_m=max_m,
+    )
 
 import os
 
