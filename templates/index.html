@@ -53,7 +53,7 @@
 
                     <div class="field wide">
                         <label>Prime p</label>
-                        <input name="p" type="number" value="{{ curve_result.p if curve_result else 2221 }}" required>
+                        <input name="p" type="number" value="{{ curve_result.p if curve_result else 23 }}" required>
                     </div>
 
                     <div class="btnrow">
@@ -108,6 +108,55 @@
                 </form>
             </div>
 
+
+            {% if curve_result %}
+            <div class="card span-4">
+                <h2>ECC Homomorphic Subtraction</h2>
+                <form method="post">
+                    <input type="hidden" name="step" value="4">
+                    <input type="hidden" name="curve_a" value="{{ curve_result.a }}">
+                    <input type="hidden" name="curve_b" value="{{ curve_result.b }}">
+                    <input type="hidden" name="curve_p" value="{{ curve_result.p }}">
+
+                    <div class="field">
+                        <label>m1 (0-{{ max_sub_m }})</label>
+                        <input name="m1" type="number" min="0" max="{{ max_sub_m }}" value="5" step="0.1" required>
+                    </div>
+
+                    <div class="field">
+                        <label>m2 (0-{{ max_sub_m }})</label>
+                        <input name="m2" type="number" min="0" max="{{ max_sub_m }}" value="5" step="0.1" required oninput="if(parseFloat(this.value) > parseFloat(this.form.m1.value)){ this.setCustomValidity('m2 must be less than m1'); } else { this.setCustomValidity(''); }">
+                    </div>
+
+                    <div class="field">
+                        <label>Private key k</label>
+                        <input name="k" type="number" min="1" value="2" required>
+                    </div>
+
+                    <div class="field">
+                        <label>r1 (random)</label>
+                        <input name="r1" type="number" min="0" max="{{ curve_result.p - 1 }}" value="3" required>
+                    </div>
+
+                    <div class="field">
+                        <label>r2 (random)</label>
+                        <input name="r2" type="number" min="0" max="{{ curve_result.p - 1 }}" value="7" required>
+                    </div>
+
+                    <div class="btnrow">
+                        <button type="submit">Compute Difference</button>
+                        {% if sub_result %}
+                        <div class="result-box">
+                            <strong>Result ({{ sub_result.m1_float }} - {{ sub_result.m2_float }}):</strong>
+                            <span class="mono">{{ sub_result.ecc_decoded_sum }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+
+
             <div class="card span-4">
                 <h2>ECC Homomorphic Scalar Multiplication</h2>
                 <form method="post">
@@ -148,6 +197,48 @@
                 </form>
             </div>
 
+
+            {% if curve_result %}
+            <div class="card span-4">
+                <h2>ECC Homomorphic approx Scalar Division</h2>
+                <form method="post">
+                    <input type="hidden" name="step" value="5">
+                    <input type="hidden" name="curve_a" value="{{ curve_result.a }}">
+                    <input type="hidden" name="curve_b" value="{{ curve_result.b }}">
+                    <input type="hidden" name="curve_p" value="{{ curve_result.p }}">
+
+                    <div class="field">
+                        <label>m1 (0-{{ max_md }})</label>
+                        <input name="m1" type="number" min="0" max="{{ max_md }}" value="4" step="0.1" required>
+                    </div>
+
+                    <div class="field">
+                        <label>s (1.0-99.0)</label>
+                        <input name="s" type="number" min="1.0" max="99.0" value="2" step="0.1" required>
+                    </div>
+
+                    <div class="field">
+                        <label>Private key k</label>
+                        <input name="k" type="number" min="1" value="2" required>
+                    </div>
+
+                    <div class="field">
+                        <label>r1 (random)</label>
+                        <input name="r1" type="number" min="0" max="{{ curve_result.p - 1 }}" value="3" required>
+                    </div>
+
+                    <div class="btnrow">
+                        <button type="submit">Compute Division</button>
+                        {% if division_result %}
+                        <div class="result-box">
+                            <strong>Result ({{ division_result.m1_float }} / {{ division_result.s_float }}):</strong>
+                            <span class="mono">{{ division_result.result }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+            {% endif %}
 
             <div class="card span-12">
                 <h2>ECC Curve</h2>
@@ -211,11 +302,11 @@
                         <div class="label">P_2</div>
                         <div class="value mono">{{ homo_result.enc_m2 }}</div>
                     </div>
-                    <div class="row">
+                    <div class="row success">
                         <div class="label">r1</div>
                         <div class="value mono">{{ homo_result.r1 }}</div>
                     </div>
-                    <div class="row">
+                    <div class="row success">
                         <div class="label">r2</div>
                         <div class="value mono">{{ homo_result.r2 }}</div>
                     </div>                    
@@ -304,7 +395,7 @@
                         <div class="label">Scaled s</div>
                         <div class="value mono">{{ scalar_result.s }}</div>
                     </div>
-                    <div class="row">
+                    <div class="row success">
                         <div class="label">r1</div>
                         <div class="value mono">{{ scalar_result.r1 }}</div>
                     </div>
@@ -344,6 +435,180 @@
                 </div>
             </div>
             {% endif %}
+
+
+            {% if division_result %}
+            <div class="card span-12">
+                <h2>Step-by-Step Scalar Division Report</h2>
+                <div class="table">
+                    {% for step in division_result.report_steps %}
+                    <div class="row {% if step.kind == 'success' %}success{% endif %}">
+                        <div class="label">{{ step.label }}</div>
+                        <div class="value mono">{{ step.value }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card span-6">
+                <h2>Private Cloud</h2>
+                <div class="table">
+                    <div class="row">
+                        <div class="label">Public key K</div>
+                        <div class="value mono">{{ division_result.K }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">Private key k</div>
+                        <div class="value mono">{{ division_result.k }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">m1</div>
+                        <div class="value mono">{{ division_result.m1 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">s (float)</div>
+                        <div class="value mono">{{ division_result.s_float }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">Inverse scalar (1/s)</div>
+                        <div class="value mono">{{ division_result.s_inv_float }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">Scaled inverse scalar</div>
+                        <div class="value mono">{{ division_result.s }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">r1</div>
+                        <div class="value mono">{{ division_result.r1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">P_m1</div>
+                        <div class="value mono">{{ division_result.P_m1 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card span-6">
+                <h2>Public Cloud</h2>
+                <div class="table">
+                    <div class="row">
+                        <div class="label">C1</div>
+                        <div class="value mono">{{ division_result.C1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2</div>
+                        <div class="value mono">{{ division_result.C2 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C1'</div>
+                        <div class="value mono">{{ division_result.C1_scaled }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2'</div>
+                        <div class="value mono">{{ division_result.C2_scaled }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">Scaled inverse scalar</div>
+                        <div class="value mono">{{ division_result.s }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if sub_result %}
+            <div class="card span-12">
+                <h2>Step-by-Step ECC Subtraction Report</h2>
+                <div class="table">
+                    {% for step in sub_result.report_steps %}
+                    <div class="row {% if step.kind == 'success' %}success{% endif %}">
+                        <div class="label">{{ step.label }}</div>
+                        <div class="value mono">{{ step.value }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="card span-6">
+                <h2>Private Cloud</h2>
+                <div class="table">
+                    <div class="row">
+                        <div class="label">Public key K</div>
+                        <div class="value mono">{{ sub_result.K }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">Private key k</div>
+                        <div class="value mono">{{ sub_result.k }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">m1</div>
+                        <div class="value mono">{{ sub_result.m1 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">m2</div>
+                        <div class="value mono">{{ sub_result.m2 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">P_1</div>
+                        <div class="value mono">{{ sub_result.enc_m1 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">P_2</div>
+                        <div class="value mono">{{ sub_result.enc_m2 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">r1</div>
+                        <div class="value mono">{{ sub_result.r1 }}</div>
+                    </div>
+                    <div class="row success">
+                        <div class="label">r2</div>
+                        <div class="value mono">{{ sub_result.r2 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C1_1</div>
+                        <div class="value mono">{{ sub_result.C1_1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2_1</div>
+                        <div class="value mono">{{ sub_result.C2_1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C1_2</div>
+                        <div class="value mono">{{ sub_result.C1_2 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2_2</div>
+                        <div class="value mono">{{ sub_result.C2_2 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card span-6">
+                <h2>Public Cloud</h2>
+                <div class="table">
+                    <div class="row">
+                        <div class="label">Public key K</div>
+                        <div class="value mono">{{ sub_result.K }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C1_1</div>
+                        <div class="value mono">{{ sub_result.C1_1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2_1</div>
+                        <div class="value mono">{{ sub_result.C2_1 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C1_2</div>
+                        <div class="value mono">{{ sub_result.C1_2 }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="label">C2_2</div>
+                        <div class="value mono">{{ sub_result.C2_2 }}</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
 
         </div>
     </div>
